@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+
+    <CommonOutputDir>$(SolutionDir)build\</CommonOutputDir>
+
+    <OutputPath>$(CommonOutputDir)bin\$(MSBuildProjectName)\</OutputPath>
+    <IntermediateOutputPath>$(CommonOutputDir)obj\$(MSBuildProjectName)\</IntermediateOutputPath>
+
+  </PropertyGroup>
+</Project>
