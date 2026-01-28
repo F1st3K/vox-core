@@ -1,10 +1,17 @@
 <Project>
   <PropertyGroup>
 
-    <CommonOutputDir>$(SolutionDir)build\</CommonOutputDir>
+    <CommonOutputDir>..\..\build\</CommonOutputDir>
 
     <OutputPath>$(CommonOutputDir)bin\$(MSBuildProjectName)\</OutputPath>
     <IntermediateOutputPath>$(CommonOutputDir)obj\$(MSBuildProjectName)\</IntermediateOutputPath>
+
+
+    <Version>0.1.0</Version>
+
+    <AssemblyVersion>$(Version).0</AssemblyVersion>
+    <FileVersion>$(Version).0</FileVersion>
+    <InformationalVersion>$(Version)</InformationalVersion>
 
   </PropertyGroup>
 </Project>
