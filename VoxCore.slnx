@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VoxCore.Infrastructure/VoxCore.Infrastructure.csproj" />
+    <Project Path="src/VoxCore.Plugins.Contracts/VoxCore.Plugins.Contracts.csproj" />
+    <Project Path="src/VoxCore.Runtime.Contracts/VoxCore.Runtime.Contracts.csproj" />
+    <Project Path="src/VoxCore.Host/VoxCore.Host.csproj" />
+    <Project Path="src/VoxCore.Runtime/VoxCore.Runtime.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,27 @@
+﻿namespace VoxCore.Plugins.Contracts;
+
+public abstract class PluginBase<TIntent, TParams> : IPlugin<TIntent, TParams>
+    where TIntent : IIntentDeclaration, new()
+    where TParams : class
+{
+    public Type ParametersType => typeof(TParams);
+
+    public abstract TIntent Intent { get; }
+
+    public abstract Task ExecuteAsync(
+        TParams parameters,
+        CancellationToken ct
+    );
+
+    async Task IPlugin.ExecuteAsync(
+        object parameters,
+        CancellationToken ct)
+    {
+        if (parameters is not TParams typed)
+            throw new InvalidOperationException(
+                $"Invalid parameters type. Expected {typeof(TParams).Name}"
+            );
+
+        await ExecuteAsync(typed, ct);
+    }
+}
