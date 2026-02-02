@@ -7,6 +7,7 @@ namespace VoxCore.Runtime;
 public class VoxCoreRuntime(
     PluginExecutor executor,
     ParameterRefiner refiner,
+    ParameterBuilder builder,
     IPluginLoader loader,
     IInputService input,
     IIntentService nlu,
@@ -51,7 +52,7 @@ public class VoxCoreRuntime(
         var dialog = new CurrentDialog(conversation, Guid.NewGuid(), executerCTS.Token);
         if (e.Message == null)
         {
-            logger.LogDebug("Message is null...");
+            logger.LogError("Message is null...");
             dialog.Say("Неслышу");
             return;
         }
@@ -59,11 +60,10 @@ public class VoxCoreRuntime(
         try
         {
             using var nluCTS = NewStopper(TimeSpan.FromSeconds(15));
-            dialog.Say(e.Message);
             var intent = await nlu.DecodeAsync(dialog.SessionId, e.Message, nluCTS.Token);
             if (intent == null)
             {
-                logger.LogDebug("NLU returned null intent name");
+                logger.LogError("NLU returned null intent name");
                 dialog.Say("Непонимаю");
                 return;
             }
@@ -71,29 +71,36 @@ public class VoxCoreRuntime(
             var p = _plugins.FirstOrDefault(p => p.Declaration.Name == intent.Name);
             if (p == null)
             {
-                logger.LogDebug($"Plugin not found {intent.Name}");
+                logger.LogError($"Plugin not found {intent.Name}");
                 dialog.Say("Я такое не умею");
                 return;
             }
 
-            var isRefined = await refiner.TryRefining(p.ParametersType, intent.Parameters, dialog);
+            var parameters = builder.TryBuild(p.ParametersType, intent.Parameters);
+            if (parameters == null)
+            {
+                logger.LogError($"Failed build parameters {p.ParametersType} -> " + "{@objParam}", intent.Parameters);
+                return;
+            }
+
+            var isRefined = await refiner.TryRefining(p.ParametersType, parameters, dialog);
             if (!isRefined)
             {
-                logger.LogDebug($"Not valid parameters for {p.ParametersType}");
+                logger.LogError($"Not valid parameters for {p.ParametersType} -> " + "{@objParam}", intent.Parameters);
                 dialog.Say("Ой... не хватило параметров...");
                 return;
             }
 
-            var isExecuted = await executor.TryExecuteAsync(p.PluginType, intent.Parameters, dialog, executerCTS.Token);
+            var isExecuted = await executor.TryExecuteAsync(p.PluginType, parameters, dialog, executerCTS.Token);
             if (!isExecuted)
             {
+                logger.LogError($"Failed on execute plugin: {p.PluginType}");
                 dialog.Say("Ой... что-то пошло не так..");
                 return;
             }
         }
         catch (OperationCanceledException) when (_runtimeStopper.IsCancellationRequested)
         {
-            dialog.Say("Завершение работы");
             logger.LogInformation("Input process is stopped...");
         }
         catch (Exception ex)

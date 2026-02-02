@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using VoxCore.Infrastructure.Contracts;
 using VoxCore.Plugins.Contracts;
 using VoxCore.Runtime.Contracts;
@@ -25,14 +24,20 @@ public sealed class RabbitIntentService(
             $"intents.response.{id}",
             async (_, data, ct) =>
             {
-                dynamic parameters = new {};
-                foreach (var e in data.Entities ?? [])
-                    parameters[e.Entity] = e.Value;
-
                 if (string.IsNullOrEmpty(data.Intent?.Name))
+                {
                     result.SetResult(null);
+                    return;
+                }
 
-                new IIntentService.Intent(data.Intent?.Name, parameters);
+                var parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var e in data.Entities ?? [])
+                    if (e != null && e.Entity != null && e.Value != null)
+                        parameters[e.Entity] = e.Value;
+
+
+                result.SetResult(new IIntentService.Intent(data.Intent.Name, parameters));
             },
             ct
         );

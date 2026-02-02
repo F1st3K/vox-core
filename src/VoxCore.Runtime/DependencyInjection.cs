@@ -9,6 +9,7 @@ public static class DependencyInjection
     public static IServiceCollection AddRuntimeEntry(this IServiceCollection services)
     {
         services.AddSingleton<PluginExecutor>();
+        services.AddSingleton<ParameterBuilder>();
         services.AddSingleton<ParameterRefiner>();
 
         services.AddSingleton<IRuntimeEntry, VoxCoreRuntime>();

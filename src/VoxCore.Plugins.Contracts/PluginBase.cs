@@ -2,7 +2,7 @@
 
 public abstract class PluginBase<TIntent, TParams> : IPlugin<TIntent, TParams>
     where TIntent : IIntentDeclaration, new()
-    where TParams : class
+    where TParams : class, new()
 {
     public Type ParametersType => typeof(TParams);
 

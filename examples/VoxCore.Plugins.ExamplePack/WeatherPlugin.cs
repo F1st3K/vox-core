@@ -1,12 +1,13 @@
-using System.Globalization;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using VoxCore.Plugins.Contracts;
 using VoxCore.Plugins.Contracts.Services;
 
 namespace VoxCore.Plugins.ExamplePack;
 
 public class WeatherPlugin(
-    ICurrentDialog dialog
+    ICurrentDialog dialog,
+    ILogger<WeatherPlugin> logger
 ) : PluginBase<WeatherPlugin.IntentDeclaration, WeatherPlugin.Params>
 {
     public override IntentDeclaration Intent { get; } = new IntentDeclaration();
@@ -70,10 +71,11 @@ public class WeatherPlugin(
         using var http = new HttpClient();
 
         using var docCords = JsonDocument.Parse(
-            await http.GetStringAsync("https://ipapi.co/json/"));
+            await http.GetStringAsync("http://ip-api.com/json/"));
 
-        var lat = docCords.RootElement.GetProperty("latitude").GetDouble();
-        var lon = docCords.RootElement.GetProperty("longitude").GetDouble();
+        var lat = docCords.RootElement.GetProperty("lat").GetDouble();
+        var lon = docCords.RootElement.GetProperty("lon").GetDouble();
+        logger.LogDebug($"Coords: {lat}, {lon}");
 
         using var weather = JsonDocument.Parse(
             await http.GetStringAsync("https://api.open-meteo.com/v1/forecast"
@@ -93,7 +95,8 @@ public class WeatherPlugin(
         var message = string.Empty;
         foreach (var f in fs)
         {
-            message += $"{StartWithCap(HumanizeDate(f.Date))} {GetWeatherDescriptionRu(f.WeatherCode)}, температура {GetTemperature(f.Temperature)}, ощущается как {GetTemperature(f.TemperatureApparent)}. ";
+            logger.LogDebug("Data: {@f}", f);
+            message += $"{StartWithCap(HumanizeDate(f.Date))} {GetWeatherDescriptionRu(f.WeatherCode)}, температура {GetTemperature(f.Temperature)} {GetGradusForm(f.Temperature)}, ощущается как {GetTemperature(f.TemperatureApparent)}. ";
         }
 
         dialog.Say(message);
@@ -142,10 +145,10 @@ public class WeatherPlugin(
     private static string GetWeatherDescriptionRu(int code) =>
         code switch
         {
-            0 => "ясно",
+            0 => "ясная погода",
 
-            1 or 2 => "преимущественно ясно, переменная облачность",
-            3 => "пасмурно",
+            1 or 2 => "преимущественно ясная погода, переменная облачность",
+            3 => "пасмурная погода",
 
             45 or 48 => "туман",
 
@@ -188,8 +191,8 @@ public class WeatherPlugin(
         var today = DateTime.Today;
         var target = date.Date;
 
-        if (Math.Abs((target - DateTime.Now).TotalMinutes) <= 1)
-            return "cейчас на улице";
+        if (Math.Abs((date - DateTime.Now).TotalMinutes) <= 30)
+            return "сичас на улице";
 
         if (target == today)
             return "сегодня в течении дня ожидается";
@@ -200,23 +203,111 @@ public class WeatherPlugin(
         if (target == today.AddDays(2))
             return "послезавтра у нас";
 
-        var culture = new CultureInfo("ru-RU");
-        var dayName = culture.DateTimeFormat.GetDayName(target.DayOfWeek);
 
         var startOfWeek = today.AddDays(-(int)today.DayOfWeek + 1);
         var endOfWeek = startOfWeek.AddDays(6);
 
         if (target >= startOfWeek && target <= endOfWeek)
-            return $"в {dayName} будет";
+            return $"{WeekDayToOrdinal((int)target.DayOfWeek)} будет";
 
-        return $"в {dayName}, {target:dd.MM}";
+        return $"{WeekDayToOrdinal((int)target.DayOfWeek)}, {DayToOrdinal(target.Day)} {MonthToOrdinal(target.Month)}";
     }
 
     private static string GetTemperature(int t) =>
         $"{(t > 0 ? "плюс " : t < 0 ? "минус " : "") + t}";
 
+    private static string GetGradusForm(int n)
+    {
+        n = Math.Abs(n) % 100;
+        int n1 = n % 10;
+
+        if (n >= 11 && n <= 14)
+            return "градусов";
+        if (n1 == 1)
+            return "градус";
+        if (n1 >= 2 && n1 <= 4)
+            return "градуса";
+        return "градусов";
+    }
+
     private static string StartWithCap(string s) =>
         string.IsNullOrEmpty(s) ? s : char.ToUpper(s[0]) + s.Substring(1);
+
+    private static string WeekDayToOrdinal(int day)
+    {
+        return day switch
+        {
+            1  => "в понедельник",
+            2  => "во вторник",
+            3  => "в среду",
+            4  => "в четверг",
+            5  => "в пятницу",
+            6  => "в субботу",
+            0  => "в Воскресенье",
+
+            _ => day.ToString()
+        };
+    }
+    private static string DayToOrdinal(int day)
+    {
+        return day switch
+        {
+            1 => "первого",
+            2 => "второго",
+            3 => "третьего",
+            4 => "четвёртого",
+            5 => "пятого",
+            6 => "шестого",
+            7 => "седьмого",
+            8 => "восьмого",
+            9 => "девятого",
+            10 => "десятого",
+            11 => "одиннадцатого",
+            12 => "двенадцатого",
+            13 => "тринадцатого",
+            14 => "четырнадцатого",
+            15 => "пятнадцатого",
+            16 => "шестнадцатого",
+            17 => "семнадцатого",
+            18 => "восемнадцатого",
+            19 => "девятнадцатого",
+            20 => "двадцатого",
+            21 => "двадцать первого",
+            22 => "двадцать второго",
+            23 => "двадцать третьего",
+            24 => "двадцать четвёртого",
+            25 => "двадцать пятого",
+            26 => "двадцать шестого",
+            27 => "двадцать седьмого",
+            28 => "двадцать восьмого",
+            29 => "двадцать девятого",
+            30 => "тридцатого",
+            31 => "тридцать первого",
+            _ => day.ToString()
+        };
+
+    }
+    private static string MonthToOrdinal(int month)
+    {
+        return month switch
+        {
+            1  => "января",
+            2  => "февраля",
+            3  => "марта",
+            4  => "апреля",
+            5  => "мая",
+            6  => "июня",
+            7  => "июля",
+            8  => "августа",
+            9  => "сентября",
+            10 => "октября",
+            11 => "ноября",
+            12 => "декабря",
+
+            _ => month.ToString()
+        };
+    }
+
 
     #endregion
 }

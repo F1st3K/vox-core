@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/examples/">
+    <Project Path="examples/VoxCore.Plugins.ExamplePack/VoxCore.Plugins.ExamplePack.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/VoxCore.Infrastructure/VoxCore.Infrastructure.csproj" />
     <Project Path="src/VoxCore.Plugins.Contracts/VoxCore.Plugins.Contracts.csproj" />

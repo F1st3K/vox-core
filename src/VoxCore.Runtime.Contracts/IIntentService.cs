@@ -4,7 +4,7 @@ namespace VoxCore.Runtime.Contracts;
 
 public interface IIntentService
 {
-    public sealed record Intent(string Name, object Parameters);
+    public sealed record Intent(string Name, IDictionary<string, object> Parameters);
 
     Task<Intent?> DecodeAsync(Guid sessionId, string rawText, CancellationToken ct);
 

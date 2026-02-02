@@ -19,8 +19,12 @@ public sealed class ParameterRefiner(
                 try
                 {
                     var value = prop.GetValue(parameters);
+
                     if (value == null)
                         value = await dialog.AskAsync($"Уточните свойство {prop.Name}");
+
+                    if (value == null || value.ToString() == string.Empty)
+                        return false;
 
                     prop.SetValue(parameters, value);
                     

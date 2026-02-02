@@ -19,7 +19,7 @@ public interface IPlugin<TIntent> : IPlugin
 
 public interface IPlugin<TIntent, TParams> : IPlugin<TIntent>, IPlugin
     where TIntent : IIntentDeclaration, new()
-    where TParams : class
+    where TParams : class, new()
 {
     Task ExecuteAsync(TParams parameters, CancellationToken ct);
 }
