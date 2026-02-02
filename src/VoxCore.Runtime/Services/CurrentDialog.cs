@@ -9,19 +9,17 @@ internal sealed class CurrentDialog : ICurrentDialog
     private readonly CancellationToken _ct;
 
     public Guid SessionId { get; }
-    public string Source { get; }
 
-    public CurrentDialog(IConversationService sessions, Guid sessionId, string source, CancellationToken ct)
+    public CurrentDialog(IConversationService sessions, Guid sessionId, CancellationToken ct)
     {
         _sessions = sessions;
         _ct = ct;
         SessionId = sessionId;
-        Source = source;
     }
 
     public void Say(string text)
-        => _sessions.Say(SessionId, Source, text, _ct);
+        => _sessions.Say(SessionId, text, _ct);
 
     public Task<string> AskAsync(string text)
-        => _sessions.AskAsync(SessionId, Source, text, _ct);
+        => _sessions.AskAsync(SessionId, text, _ct);
 }

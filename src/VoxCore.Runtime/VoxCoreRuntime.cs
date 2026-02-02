@@ -24,6 +24,7 @@ public class VoxCoreRuntime(
 
         using var loaderCTS = NewStopper(TimeSpan.FromMinutes(1));
         _plugins = await loader.LoadPlugins().ToArrayAsync(loaderCTS.Token);
+        logger.LogDebug($"Count loaded plugins: {_plugins.Length}");
 
         using var nluConfCTS = NewStopper(TimeSpan.FromMinutes(3));
         await nlu.ConfigureAsync(
@@ -44,12 +45,13 @@ public class VoxCoreRuntime(
         _runtimeStopper = CancellationToken.None;
     }
 
-    private async void InputHandler(object? sender, IInputService.Args e)
+    private async void InputHandler(object? sender, IInputService.InputData e)
     {
         using var executerCTS = NewStopper();
-        var dialog = new CurrentDialog(conversation, Guid.NewGuid(), e.Source, executerCTS.Token);
+        var dialog = new CurrentDialog(conversation, Guid.NewGuid(), executerCTS.Token);
         if (e.Message == null)
         {
+            logger.LogDebug("Message is null...");
             dialog.Say("Неслышу");
             return;
         }
@@ -57,9 +59,11 @@ public class VoxCoreRuntime(
         try
         {
             using var nluCTS = NewStopper(TimeSpan.FromSeconds(15));
-            var intent = await nlu.DecodeAsync(e.Message, nluCTS.Token);
+            dialog.Say(e.Message);
+            var intent = await nlu.DecodeAsync(dialog.SessionId, e.Message, nluCTS.Token);
             if (intent == null)
             {
+                logger.LogDebug("NLU returned null intent name");
                 dialog.Say("Непонимаю");
                 return;
             }
@@ -67,6 +71,7 @@ public class VoxCoreRuntime(
             var p = _plugins.FirstOrDefault(p => p.Declaration.Name == intent.Name);
             if (p == null)
             {
+                logger.LogDebug($"Plugin not found {intent.Name}");
                 dialog.Say("Я такое не умею");
                 return;
             }
@@ -74,6 +79,7 @@ public class VoxCoreRuntime(
             var isRefined = await refiner.TryRefining(p.ParametersType, intent.Parameters, dialog);
             if (!isRefined)
             {
+                logger.LogDebug($"Not valid parameters for {p.ParametersType}");
                 dialog.Say("Ой... не хватило параметров...");
                 return;
             }

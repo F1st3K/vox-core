@@ -15,13 +15,24 @@ public sealed class LocalPluginLoader(
 {
     public async IAsyncEnumerable<Plugin> LoadPlugins()
     {
-        if (!Directory.Exists(config.Value.PluginsPath))
+        string path;
+        if (Path.IsPathRooted(config.Value.PluginsPath))
         {
-            logger.LogWarning($"Failed load plugins, not exist path {config.Value.PluginsPath}");
+            path = config.Value.PluginsPath;
+        }
+        else
+        {
+            path = Path.Combine(AppContext.BaseDirectory, config.Value.PluginsPath);
+            path = Path.GetFullPath(path);
+        }
+
+        if (!Directory.Exists(path))
+        {
+            logger.LogError($"Failed load plugins, not exist path {path}");
             yield break;
         }
 
-        foreach (var dll in Directory.GetFiles(config.Value.PluginsPath, "*.dll"))
+        foreach (var dll in Directory.GetFiles(path, "*.dll"))
         {
             Assembly assembly;
             try
@@ -30,7 +41,7 @@ public sealed class LocalPluginLoader(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, $"Failed on load dll: {dll}, skipped...");
+                logger.LogError(ex, $"Failed on load dll: {dll}, skipped...");
                 continue;
             }
 
@@ -67,7 +78,8 @@ public sealed class LocalPluginLoader(
                         continue;
                     }
 
-                    logger.LogInformation($"Loaded plugin: {type.Name}, intent: {intentDeclaration.Name} parameters: {parametersType}");
+                    logger.LogInformation($"Loaded plugin:  {type},\n    intent:     {intentType + " : \"" + intentDeclaration.Name}\",\n    parameters: {parametersType};"
+                    );
                     await Task.Yield();
                     yield return new Plugin(type, parametersType, intentDeclaration);
                 }

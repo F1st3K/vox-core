@@ -2,25 +2,18 @@ namespace VoxCore.Infrastructure.Contracts;
 
 public interface IRabbitBus
 {
-    public Task PublishAsync(
+    public Task PublishAsync<TData>(
         string exchange,
         string routingKey,
-        object body,
+        TData body,
         CancellationToken ct = default
     );
 
 
-    public Task SubscribeAsync(
+    public Task<IAsyncDisposable> SubscribeAsync<TData>(
         string exchange,
         string routingKey,
-        Func<string, dynamic, CancellationToken, Task> handler,
-        CancellationToken ct = default
-    );
-
-    public Task<dynamic> RpcAsync(
-        string exchange,
-        string routingKey,
-        object body,  
+        Func<string, TData, CancellationToken, Task> handler,
         CancellationToken ct = default
     );
 }

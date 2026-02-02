@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using VoxCore.Infrastructure.Contracts;
+using VoxCore.Infrastructure.Services;
 
 namespace VoxCore.Infrastructure.Workers;
 
@@ -15,21 +16,20 @@ public sealed class RabbitBusWorker(
     ILogger<RabbitBusWorker> logger
 ) : BackgroundService, IRabbitBus
 {
-    private IChannel? _publishChannel;
-    private IChannel? _consumeChannel;
+    private readonly TaskCompletionSource<IChannel> _publishChannelTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<IConnection> _connectionTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         try
         {
-            var cf = new ConnectionFactory
-            {
-                Uri = new Uri(options.Value.ConnectionString),
-            };
+            var cf = new ConnectionFactory { Uri = new Uri(options.Value.ConnectionString) };
 
             var connection = await cf.CreateConnectionAsync(cancellationToken: stoppingToken);
-            _publishChannel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
-            _consumeChannel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
+            _connectionTcs.SetResult(connection);
+
+            _publishChannelTcs.SetResult(
+                await connection.CreateChannelAsync(cancellationToken: stoppingToken));
 
             logger.LogInformation("RabbitMQ Bus started ...");
 
@@ -41,15 +41,23 @@ public sealed class RabbitBusWorker(
         }
     }
 
-    public async Task PublishAsync(
+    public async Task PublishAsync<TData>(
         string exchange,
         string routingKey,
-        object body,
+        TData body,
         CancellationToken ct = default)
     {
-        if (_publishChannel is null) throw new InvalidOperationException("Bus not started");
+        var publishChannel = await _publishChannelTcs.Task;
 
-        await _publishChannel.BasicPublishAsync(
+        await publishChannel.ExchangeDeclareAsync(
+            exchange,
+            type: "topic",
+            durable: true,
+            autoDelete: false,
+            cancellationToken: ct
+        );
+
+        await publishChannel.BasicPublishAsync(
             exchange: exchange,
             routingKey: routingKey,
             mandatory: false,
@@ -58,15 +66,26 @@ public sealed class RabbitBusWorker(
         );
     }
 
-    public async Task SubscribeAsync(
+    public async Task<IAsyncDisposable> SubscribeAsync<TData>(
         string exchange,
         string routingKey,
-        Func<string, dynamic, CancellationToken, Task> handler,
+        Func<string, TData, CancellationToken, Task> handler,
         CancellationToken ct = default)
     {
-        if (_consumeChannel is null) throw new InvalidOperationException("Bus not started");
+        var connection = await _connectionTcs.Task;
+        var channel = await connection.CreateChannelAsync(cancellationToken: ct);
 
-        var queueName = (await _consumeChannel.QueueDeclareAsync(
+        await channel.BasicQosAsync(0, 1, false, ct);
+
+        await channel.ExchangeDeclareAsync(
+            exchange,
+            type: "topic",
+            durable: true,
+            autoDelete: false,
+            cancellationToken: ct
+        );
+
+        var queueName = (await channel.QueueDeclareAsync(
             queue: "",
             durable: false,
             exclusive: true,
@@ -74,117 +93,40 @@ public sealed class RabbitBusWorker(
             cancellationToken: ct
         )).QueueName;
 
-        await _consumeChannel.QueueBindAsync(
-            queue: queueName,
-            exchange: exchange,
-            routingKey: routingKey,
-            cancellationToken: ct
-        );
+        await channel.QueueBindAsync(queueName, exchange, routingKey, cancellationToken: ct);
 
-        var consumer = new AsyncEventingBasicConsumer(_consumeChannel);
+        var consumer = new AsyncEventingBasicConsumer(channel);
+
         consumer.ReceivedAsync += async (_, ea) =>
         {
             try
             {
-                dynamic? body = JsonSerializer.Deserialize<ExpandoObject>(
-                    Encoding.UTF8.GetString(ea.Body.Span));
+                var data = Encoding.UTF8.GetString(ea.Body.Span);
+                var body = JsonSerializer.Deserialize<TData>(data, JsonSerializerOptions.Web)!;
 
                 await handler(ea.Exchange, body, ct);
-
-                await _consumeChannel.BasicAckAsync(ea.DeliveryTag, false);
+                await channel.BasicAckAsync(ea.DeliveryTag, false);
             }
             catch (OperationCanceledException)
             {
-                logger.LogInformation("Message handling cancelled");
-                await _consumeChannel.BasicNackAsync(ea.DeliveryTag, false, true);
+                logger.LogDebug("Message handling cancelled");
+                await channel.BasicNackAsync(ea.DeliveryTag, false, true);
             }
             catch (Exception ex)
             {
                 logger.LogError(ex, "Message handling failed");
-                await _consumeChannel.BasicNackAsync(ea.DeliveryTag, false, true);
+                await channel.BasicNackAsync(ea.DeliveryTag, false, true);
             }
         };
 
-        await _consumeChannel.BasicConsumeAsync(
+        var consumerTag = await channel.BasicConsumeAsync(
             queue: queueName,
             autoAck: false,
             consumer: consumer,
             cancellationToken: ct
         );
+
+        return new RabbitSubscription(channel, consumerTag, logger);
     }
 
-    public async Task<dynamic> RpcAsync(
-        string exchange,
-        string routingKey,
-        object body,
-        CancellationToken ct = default)
-    {
-        if (_publishChannel is null || _consumeChannel is null)
-            throw new InvalidOperationException("Bus not started");
-
-        string correlationId = Guid.NewGuid().ToString();
-
-        var replyQueue = (await _consumeChannel.QueueDeclareAsync(
-            queue: "",
-            durable: false,
-            exclusive: true,
-            autoDelete: true,
-            cancellationToken: ct
-        )).QueueName;
-
-        var tcs = new TaskCompletionSource<dynamic?>();
-
-        var consumer = new AsyncEventingBasicConsumer(_consumeChannel);
-        consumer.ReceivedAsync += async (_, ea) =>
-        {
-            try
-            {
-                if (ea.BasicProperties?.CorrelationId == correlationId)
-                {
-                    dynamic? response = JsonSerializer.Deserialize<ExpandoObject>(
-                        Encoding.UTF8.GetString(ea.Body.Span)
-                    );
-
-                    tcs.TrySetResult(response);
-                    await _consumeChannel.BasicAckAsync(ea.DeliveryTag, false);
-                }
-                else
-                {
-                    await _consumeChannel.BasicNackAsync(ea.DeliveryTag, false, true);
-                }
-            }
-            catch (Exception ex)
-            {
-                tcs.TrySetException(ex);
-                await _consumeChannel.BasicNackAsync(ea.DeliveryTag, false, true);
-            }
-        };
-
-        string consumerTag = await _consumeChannel.BasicConsumeAsync(
-            queue: replyQueue,
-            autoAck: false,
-            consumer: consumer,
-            cancellationToken: ct
-        );
-
-        byte[] bodyBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(body));
-
-        var props = new BasicProperties();
-        props.CorrelationId = correlationId;
-        props.ReplyTo = replyQueue;
-
-        await _publishChannel.BasicPublishAsync(
-            exchange: exchange,
-            routingKey: routingKey,
-            mandatory: false,
-            basicProperties: props,
-            body: bodyBytes,
-            cancellationToken: ct
-        );
-
-        using (ct.Register(() => tcs.TrySetCanceled()))
-        {
-            return await tcs.Task ?? new {};
-        }
-    }
 }

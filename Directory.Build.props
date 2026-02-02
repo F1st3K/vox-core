@@ -13,5 +13,9 @@
     <FileVersion>$(Version).0</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
 
+    <Authors>F1st3K</Authors>
+    <Company>VoxCore</Company>
+    <RepositoryUrl>https://github.com/F1st3K/vox-core</RepositoryUrl>
+
   </PropertyGroup>
 </Project>
