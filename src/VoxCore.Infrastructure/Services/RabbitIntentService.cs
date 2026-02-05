@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using VoxCore.Infrastructure.Contracts;
 using VoxCore.Plugins.Contracts;
 using VoxCore.Runtime.Contracts;
@@ -5,7 +6,8 @@ using VoxCore.Runtime.Contracts;
 namespace VoxCore.Infrastructure.Services;
 
 public sealed class RabbitIntentService(
-    IRabbitBus bus
+    IRabbitBus bus,
+    ILogger<RabbitIntentService> logger
 ) : IIntentService
 {
     public async Task ConfigureAsync(IEnumerable<IIntentDeclaration> declaredIntents, CancellationToken ct)
@@ -24,12 +26,12 @@ public sealed class RabbitIntentService(
             $"intents.response.{id}",
             async (_, data, ct) =>
             {
+                logger.LogDebug("Data: {@data}", data);
                 if (string.IsNullOrEmpty(data.Intent?.Name))
                 {
                     result.SetResult(null);
                     return;
                 }
-
                 var parameters = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var e in data.Entities ?? [])

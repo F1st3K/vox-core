@@ -15,14 +15,14 @@ public sealed class RabbitConversationService(
         var id = Guid.NewGuid();
         await using var sub = await bus.SubscribeAsync<TextDTO>(
             "raw_text",
-            $"raw_text.response.{id}",
+            $"raw_text.response.voice",
             async (_, data, ct) =>
             {
                 result.SetResult(data.Text ?? string.Empty);
             },
             ct
         );
-        await bus.PublishAsync("speech", $"speech.ask.{id}", body, ct);
+        await bus.PublishAsync("speech", $"speech.ask.voice", body, ct);
         return await result.Task;
     }
 

@@ -68,6 +68,7 @@ public class WeatherPlugin(
 
     public override async Task ExecuteAsync(Params parameters, CancellationToken ct)
     {
+        logger.LogDebug($"Now: {DateTime.Now}");
         using var http = new HttpClient();
 
         using var docCords = JsonDocument.Parse(
@@ -83,7 +84,7 @@ public class WeatherPlugin(
                 + $"&longitude={lon}"
                 + "&daily=temperature_2m_mean,apparent_temperature_mean,weather_code"
                 + "&current=temperature_2m,apparent_temperature,weather_code"
-                + "&timezone=auto"
+                // + "&timezone=auto"
                 + (parameters.CountDays.HasValue
                     ? $"&start_date={DateTime.Today.AddDays(1):yyyy-MM-dd}"
                     + $"&end_date={DateTime.Today.AddDays((double)parameters.CountDays):yyyy-MM-dd}"

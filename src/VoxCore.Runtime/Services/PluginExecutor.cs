@@ -33,6 +33,7 @@ public sealed class PluginExecutor(
 
         try
         {
+            logger.LogDebug("Execute plugin: {@name}\n    with params: {@parameters}", pluginType, parameters);
             await plugin.ExecuteAsync(parameters, ct);
 
             return true;

@@ -1,12 +1,16 @@
 using System.Reflection;
+using Microsoft.Extensions.Logging;
 using VoxCore.Plugins.Contracts;
 
 namespace VoxCore.Runtime.Services;
 
-public sealed class ParameterBuilder
+public sealed class ParameterBuilder(
+    ILogger<ParameterBuilder> logger
+)
 {
     internal async Task<object?> TryBuild(Type parametersType, IDictionary<string, object> values)
     {
+        logger.LogDebug($"Type for build params: {parametersType}");
         if (parametersType == typeof(NoParameters))
             return new NoParameters();
 
@@ -27,6 +31,7 @@ public sealed class ParameterBuilder
                 p.SetValue(param, Convert.ChangeType(val, p.PropertyType));
         }
 
+        logger.LogDebug("Build typed instance params: {@param}", param);
         return param;
     }
 }

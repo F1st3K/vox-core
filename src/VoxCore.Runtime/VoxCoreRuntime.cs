@@ -76,7 +76,7 @@ public class VoxCoreRuntime(
                 return;
             }
 
-            var parameters = builder.TryBuild(p.ParametersType, intent.Parameters);
+            var parameters = await builder.TryBuild(p.ParametersType, intent.Parameters);
             if (parameters == null)
             {
                 logger.LogError($"Failed build parameters {p.ParametersType} -> " + "{@objParam}", intent.Parameters);
