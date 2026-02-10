@@ -14,7 +14,7 @@ public class WeatherPlugin(
 
     public class IntentDeclaration() : IIntentDeclaration
     {
-        public string Name => "weather";
+        public string Name => "weather-free";
 
         public IEnumerable<string> Examples =>
         [
