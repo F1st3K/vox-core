@@ -28,6 +28,14 @@ public static class DependencyInjection
         return services;
     }
 
+    private static IOptions<TOptions> GetOptions<TOptions>(this IConfigurationManager config)
+        where TOptions : Settings.OptionsBase, new()
+    {
+        var settings = new TOptions();
+        config.Bind(settings.SectionName, settings);
+        return Options.Create(settings);
+    }
+
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
         services.AddSingleton<IPluginLoader, LocalPluginLoader>();
@@ -36,6 +44,12 @@ public static class DependencyInjection
         services.AddSingleton<IConversationService, RabbitConversationService>();
         services.AddSingleton<RabbitBusWorker>();
         services.AddSingleton<IRabbitBus>(sp => sp.GetRequiredService<RabbitBusWorker>());
+
+        services.AddTransient<ITextNormalaizer, Services.Normalizers.Number>();
+        // services.AddTransient<ITextNormalaizer, Services.Normalizers.Date>();
+        // services.AddTransient<ITextNormalaizer, Services.Normalizers.Weekday>();
+        // services.AddTransient<ITextNormalaizer, Services.Normalizers.Time>();
+        // services.AddTransient<ITextNormalaizer, Services.Normalizers.Period>();
 
         return services;
     }
@@ -46,13 +60,5 @@ public static class DependencyInjection
         services.AddHostedService(sp => sp.GetRequiredService<RabbitBusWorker>());
 
         return services;
-    }
-
-    private static IOptions<TOptions> GetOptions<TOptions>(this IConfigurationManager config)
-        where TOptions : Settings.OptionsBase, new()
-    {
-        var settings = new TOptions();
-        config.Bind(settings.SectionName, settings);
-        return Options.Create(settings);
     }
 }

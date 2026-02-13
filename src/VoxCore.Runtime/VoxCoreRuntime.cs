@@ -5,6 +5,7 @@ using VoxCore.Runtime.Services;
 namespace VoxCore.Runtime;
 
 public class VoxCoreRuntime(
+    IEnumerable<ITextNormalaizer> normalaizers,
     PluginExecutor executor,
     ParameterRefiner refiner,
     ParameterBuilder builder,
@@ -50,17 +51,26 @@ public class VoxCoreRuntime(
     {
         using var executerCTS = NewStopper();
         var dialog = new CurrentDialog(conversation, Guid.NewGuid(), executerCTS.Token);
-        if (e.Message == null)
+        if (string.IsNullOrEmpty(e.Message))
         {
             logger.LogError("Message is null...");
-            dialog.Say("Неслышу");
+            dialog.Say("Не слышу");
             return;
         }
 
+
         try
         {
+            var msg = e.Message;
+            using var normalizeCTS = NewStopper(TimeSpan.FromSeconds(5));
+            foreach (var n in normalaizers)
+            {
+                msg = await n.NormalizeAsync(msg, normalizeCTS.Token);
+                logger.LogDebug(msg);
+            }
+
             using var nluCTS = NewStopper(TimeSpan.FromSeconds(15));
-            var intent = await nlu.DecodeAsync(dialog.SessionId, e.Message, nluCTS.Token);
+            var intent = await nlu.DecodeAsync(dialog.SessionId, msg, nluCTS.Token);
             if (intent == null)
             {
                 logger.LogError("NLU returned null intent name");

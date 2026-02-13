@@ -6,6 +6,8 @@ public abstract class PluginBase<TIntent, TParams> : IPlugin<TIntent, TParams>
 {
     public Type ParametersType => typeof(TParams);
 
+    public bool IsEnabled { get; set; } = true;
+
     public abstract TIntent Intent { get; }
 
     public abstract Task ExecuteAsync(
