@@ -24,23 +24,22 @@ public sealed class ParameterBuilder(
             if (!p.CanWrite)
                 continue;
 
-            if (!values.TryGetValue(p.Name, out var val))
+            if (!values.TryGetValue(p.Name, out var val) || val == null)
                 continue;
 
             var targetType = p.PropertyType;
             var underlying = Nullable.GetUnderlyingType(targetType);
             var actualType = underlying ?? targetType;
 
-            // null значение
-            if (val == null || val.ToString() == "null")
+            var valStr = val.ToString();
+            
+            if (string.IsNullOrEmpty(valStr) || valStr == "null")
             {
                 if (!targetType.IsValueType || underlying != null)
                     p.SetValue(param, null);
-
                 continue;
             }
 
-            // если уже нужный тип
             if (actualType.IsInstanceOfType(val))
             {
                 p.SetValue(param, val);
@@ -53,19 +52,19 @@ public sealed class ParameterBuilder(
 
                 if (actualType.IsEnum)
                 {
-                    converted = Enum.Parse(actualType, val.ToString(), true);
+                    converted = Enum.Parse(actualType, valStr, true);
                 }
                 else if (actualType == typeof(Guid))
                 {
-                    converted = Guid.Parse(val.ToString());
+                    converted = Guid.Parse(valStr);
                 }
                 else if (actualType == typeof(DateTime))
                 {
-                    converted = DateTime.Parse(val.ToString());
+                    converted = DateTime.Parse(valStr);
                 }
                 else if (actualType == typeof(bool))
                 {
-                    var s = val.ToString().ToLower();
+                    var s = valStr.ToLower();
                     converted = s switch
                     {
                         "1" => true,

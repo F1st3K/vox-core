@@ -8,7 +8,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.2" />
-    <PackageReference Include="VoxCore.Plugins.Contracts" Version="0.1.0" />
+    <!--<PackageReference Include="VoxCore.Plugins.Contracts" Version="x.x.x" />-->
+
+    <ProjectReference Include="..\..\src\VoxCore.Plugins.Contracts\VoxCore.Plugins.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

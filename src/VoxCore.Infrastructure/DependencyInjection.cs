@@ -5,6 +5,7 @@ using VoxCore.Runtime.Contracts;
 using VoxCore.Infrastructure.Services;
 using VoxCore.Infrastructure.Workers;
 using VoxCore.Infrastructure.Contracts;
+using VoxCore.Plugins.Contracts.Services;
 
 namespace VoxCore.Infrastructure;
 
@@ -38,12 +39,14 @@ public static class DependencyInjection
 
     private static IServiceCollection AddServices(this IServiceCollection services)
     {
+        services.AddSingleton<RabbitBusWorker>();
+        services.AddSingleton<IRabbitBus>(sp => sp.GetRequiredService<RabbitBusWorker>());
+
         services.AddSingleton<IPluginLoader, LocalPluginLoader>();
         services.AddSingleton<IInputService, RabbitInputService>();
         services.AddSingleton<IIntentService, RabbitIntentService>();
         services.AddSingleton<IConversationService, RabbitConversationService>();
-        services.AddSingleton<RabbitBusWorker>();
-        services.AddSingleton<IRabbitBus>(sp => sp.GetRequiredService<RabbitBusWorker>());
+        services.AddSingleton<IDeviceBus, RabbitToMqttDeviceBus>();
 
         services.AddTransient<ITextNormalaizer, Services.Normalizers.Number>();
         // services.AddTransient<ITextNormalaizer, Services.Normalizers.Date>();
